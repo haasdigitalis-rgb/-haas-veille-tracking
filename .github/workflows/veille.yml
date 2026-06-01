@@ -1,0 +1,12 @@
+name: Veille tracking parc HAAS
+on:
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch: {}
+jobs:
+  veille:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan parc + maj Google Sheet + alertes
+        run: python3 veille.py
