@@ -70,7 +70,8 @@ def uniq(rx, s):
 
 
 rows = [["Client", "Vertical", "Page", "URL", "Domaine", "AW", "GT", "GTM", "Dexem", "Derniere MAJ"]]
-alerts = []
+critical = []   # font echouer le run (= email d'alerte)
+warnings = []   # notes (run reste vert)
 
 for client, vert, page, url in PAGES:
     code, html = fetch(url)
@@ -81,17 +82,20 @@ for client, vert, page, url in PAGES:
     dom = re.sub(r"^https?://", "", url).split("/")[0]
     rows.append([client, vert, page, url, dom, aw, gt, gtm, dx, maj])
 
+    # --- CRITIQUE : fait echouer le run ---
     if code != 200:
-        alerts.append(f"HTTP {code} : {client} - {page} ({url})")
+        critical.append(f"HTTP {code} : {client} - {page} ({url})")
     elif not (aw or gt or gtm or dx):
-        alerts.append(f"AUCUN tag : {client} - {page} ({url})")
-    if re.search(r"A-REMPLIR|G-XXXXXXXXXX|CONVERSION_LABEL|AW-XXXX", html):
-        alerts.append(f"Placeholder non rempli : {client} - {page} ({url})")
+        critical.append(f"AUCUN tag : {client} - {page} ({url})")
     if "AW-18053507821" in aw and "saintmaur" in url:
-        alerts.append(f"CONTAMINATION : compte Help Confort (AW-18053507821) sur Saint-Maur ({url})")
+        critical.append(f"CONTAMINATION : compte Help Confort sur Saint-Maur ({url})")
     for key, exp in REF.items():
         if key in url and aw and exp not in aw:
-            alerts.append(f"Regression AW : {url} -> {aw} au lieu de {exp}")
+            critical.append(f"Regression AW : {url} -> {aw} au lieu de {exp}")
+
+    # --- AVERTISSEMENT : residu placeholder (souvent inoffensif, ex. noscript) ---
+    if re.search(r"A-REMPLIR|G-XXXXXXXXXX|CONVERSION_LABEL|AW-XXXX", html):
+        warnings.append(f"Placeholder residuel : {client} - {page} ({url})")
 
 # Envoi vers le Google Sheet (webhook Apps Script). Reponse HTML ignoree (normal).
 try:
@@ -103,9 +107,13 @@ except Exception as e:
     print("POST webhook:", e)
 
 print(f"Scan termine — {len(rows) - 1} pages, Google Sheet mis a jour ({maj}).")
-if alerts:
-    print("\nALERTES :")
-    for a in alerts:
+if warnings:
+    print("\n[Avertissements - non bloquants]")
+    for w in warnings:
+        print("  -", w)
+if critical:
+    print("\n*** ALERTES CRITIQUES ***")
+    for a in critical:
         print("  -", a)
     raise SystemExit(1)
-print("Parc sain — aucune anomalie.")
+print("\nParc sain — aucune anomalie critique.")
