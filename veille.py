@@ -69,7 +69,7 @@ def uniq(rx, s):
     return ",".join(sorted(set(re.findall(rx, s))))
 
 
-rows = [["Client", "Vertical", "Page", "URL", "Domaine", "AW", "GT", "GTM", "Dexem", "Derniere MAJ"]]
+rows = [["Client", "Vertical", "Page", "URL", "Domaine", "AW", "GT", "GTM", "Dexem", "URLpass", "Derniere MAJ"]]
 critical = []   # font echouer le run (= email d'alerte)
 warnings = []   # notes (run reste vert)
 
@@ -79,8 +79,9 @@ for client, vert, page, url in PAGES:
     gt = uniq(r"GT-[A-Z0-9]{6,}", html)
     gtm = uniq(r"GTM-[A-Z0-9]{5,}", html)
     dx = ",".join(sorted(set(re.findall(r"cdn\.dexem\.net/tags/([A-Za-z0-9-]{6,})", html))))
+    up = "OUI" if "url_passthrough" in html else "NON"
     dom = re.sub(r"^https?://", "", url).split("/")[0]
-    rows.append([client, vert, page, url, dom, aw, gt, gtm, dx, maj])
+    rows.append([client, vert, page, url, dom, aw, gt, gtm, dx, up, maj])
 
     # --- CRITIQUE : fait echouer le run ---
     if code != 200:
@@ -92,6 +93,9 @@ for client, vert, page, url in PAGES:
     for key, exp in REF.items():
         if key in url and aw and exp not in aw:
             critical.append(f"Regression AW : {url} -> {aw} au lieu de {exp}")
+    # url_passthrough manquant sur une page taguee Google = perte de conversions (gclid non capte)
+    if (aw or gt or gtm) and "url_passthrough" not in html:
+        critical.append(f"url_passthrough MANQUANT (perte conversions gclid) : {client} - {page} ({url})")
 
     # --- AVERTISSEMENT : residu placeholder (souvent inoffensif, ex. noscript) ---
     if re.search(r"A-REMPLIR|G-XXXXXXXXXX|CONVERSION_LABEL|AW-XXXX", html):
